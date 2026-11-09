@@ -45,8 +45,15 @@ The following attributes are exported:
 * `disk` - Size of the flavor's root disk in GB. This is the primary system disk provisioned for instances created from this flavor.
 * `swap` - Size of the flavor's swap space in MB. Zero when the flavor provides no swap.
 * `ephemeral` - Size of the flavor's ephemeral disk in GB. Ephemeral storage is transient: its contents do not survive a rebuild or deletion of the instance. Zero when the flavor provides no ephemeral disk.
+* `gpus` - Number of physical GPUs provided by the flavor. Zero for flavors without GPU.
 * `is_public` - Whether the flavor is publicly available to the project. Private flavors are only visible to the projects they have been explicitly shared with.
 * `description` - Free-form description of the flavor as reported by the backend. May be empty when no description is advertised for this flavor.
-* `location` - Region (and, where applicable, availability zone) where this flavor is offered. The flavor catalog is per-region: a flavor returned for one region is not guaranteed to exist, or to carry the same characteristics, in another:
+* `location` - Region where this flavor is offered, whether it is activated on the project and its availability zones. The flavor catalog is per-region: a flavor returned for one region is not guaranteed to exist, or to carry the same characteristics, in another:
   * `region` - Region code.
-  * `availability_zone` - Availability zone within the region.
+  * `availability_zone` - **Deprecated**: always empty, a flavor is offered per region, not per availability zone. Use `availability_zones` instead.
+  * `region_activated` - Whether the region is already activated on the project. When false, the region must be activated on the project before use.
+  * `availability_zones` - Availability zones of the region (for example `eu-west-par-a`, `eu-west-par-b`, `eu-west-par-c`). Empty for a single-AZ region.
+* `bandwidth` - Network bandwidth an instance of the flavor gets, in Mbit/s:
+  * `private` - Bandwidth on private networks (vRack), in Mbit/s. Null when the flavor does not declare it.
+  * `public_inbound` - Inbound bandwidth on the public network, in Mbit/s. Null when the flavor does not declare it.
+  * `public_outbound` - Outbound bandwidth on the public network, in Mbit/s. Null when the flavor does not declare it.

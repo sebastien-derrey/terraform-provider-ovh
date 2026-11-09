@@ -13,13 +13,25 @@ import (
 // CloudRegion is the API response for publicCloud.reference.Region (OVHcloud API v2),
 // returned by GET /v2/publicCloud/project/{serviceName}/reference/region[/{name}].
 type CloudRegion struct {
-	Name              string   `json:"name"`
-	Status            string   `json:"status"`
-	Continent         string   `json:"continent"`
-	Country           string   `json:"country"`
-	DatacenterName    string   `json:"datacenterName"`
-	AvailabilityZones []string `json:"availabilityZones"`
-	Services          []string `json:"services"`
+	Name              string                       `json:"name"`
+	Status            string                       `json:"status"`
+	Continent         string                       `json:"continent"`
+	Country           string                       `json:"country"`
+	DatacenterName    string                       `json:"datacenterName"`
+	AvailabilityZones []string                     `json:"availabilityZones"`
+	Services          []string                     `json:"services"`
+	Type              *string                      `json:"type"`
+	Activated         bool                         `json:"activated"`
+	ObjectStorage     *cloudRegionAPIObjectStorage `json:"objectStorage"`
+}
+
+// cloudRegionAPIObjectStorage is publicCloud.reference.RegionObjectStorage.
+type cloudRegionAPIObjectStorage struct {
+	BareContainerOnly      bool     `json:"bareContainerOnly"`
+	IsReplicationTarget    bool     `json:"isReplicationTarget"`
+	LifecycleTargetClasses []string `json:"lifecycleTargetClasses"`
+	ReplicationSupported   bool     `json:"replicationSupported"`
+	StorageClasses         []string `json:"storageClasses"`
 }
 
 // cloudRegionDataSourceModel is the Terraform model for the singular ovh_cloud_region data source.
@@ -32,6 +44,9 @@ type cloudRegionDataSourceModel struct {
 	DatacenterName    ovhtypes.TfStringValue `tfsdk:"datacenter_name"`
 	AvailabilityZones types.List             `tfsdk:"availability_zones"`
 	Services          types.List             `tfsdk:"services"`
+	Type              ovhtypes.TfStringValue `tfsdk:"type"`
+	Activated         types.Bool             `tfsdk:"activated"`
+	ObjectStorage     types.Object           `tfsdk:"object_storage"`
 }
 
 // cloudRegionsDataSourceModel is the Terraform model for the plural ovh_cloud_regions data source.
@@ -82,6 +97,51 @@ func cloudRegionDetailAttributes() map[string]schema.Attribute {
 			Description:         "Available OpenStack services in the region",
 			MarkdownDescription: "Available OpenStack services in the region",
 		},
+		"type": schema.StringAttribute{
+			CustomType:          ovhtypes.TfStringType{},
+			Computed:            true,
+			Description:         "Region type (LOCAL-ZONE, REGION-1-AZ or REGION-3-AZ); null when the catalog reports an unrecognized type",
+			MarkdownDescription: "Region type (`LOCAL-ZONE`, `REGION-1-AZ` or `REGION-3-AZ`); null when the catalog reports an unrecognized type",
+		},
+		"activated": schema.BoolAttribute{
+			Computed:            true,
+			Description:         "Whether the region is activated on the project. When false, the region exists but is not yet activated for the project",
+			MarkdownDescription: "Whether the region is activated on the project. When false, the region exists but is not yet activated for the project",
+		},
+		"object_storage": schema.SingleNestedAttribute{
+			Computed:            true,
+			Description:         "Object storage capabilities of the region; null when the region offers no object storage",
+			MarkdownDescription: "Object storage capabilities of the region; null when the region offers no object storage",
+			Attributes: map[string]schema.Attribute{
+				"bare_container_only": schema.BoolAttribute{
+					Computed:            true,
+					Description:         "Whether the region only supports bare containers, without the additional bucket features (encryption, versioning, object lock, lifecycle, replication)",
+					MarkdownDescription: "Whether the region only supports bare containers, without the additional bucket features (encryption, versioning, object lock, lifecycle, replication)",
+				},
+				"is_replication_target": schema.BoolAttribute{
+					Computed:            true,
+					Description:         "Whether a bucket in this region can be used as the destination of a replication rule",
+					MarkdownDescription: "Whether a bucket in this region can be used as the destination of a replication rule",
+				},
+				"lifecycle_target_classes": schema.ListAttribute{
+					ElementType:         types.StringType,
+					Computed:            true,
+					Description:         "Storage classes that can be used as a transition target in a lifecycle rule in this region",
+					MarkdownDescription: "Storage classes that can be used as a transition target in a lifecycle rule in this region",
+				},
+				"replication_supported": schema.BoolAttribute{
+					Computed:            true,
+					Description:         "Whether replication rules can be configured on buckets located in this region",
+					MarkdownDescription: "Whether replication rules can be configured on buckets located in this region",
+				},
+				"storage_classes": schema.ListAttribute{
+					ElementType:         types.StringType,
+					Computed:            true,
+					Description:         "Storage classes orderable in this region",
+					MarkdownDescription: "Storage classes orderable in this region",
+				},
+			},
+		},
 	}
 }
 
@@ -96,7 +156,45 @@ func cloudRegionObjectAttrTypes() map[string]attr.Type {
 		"datacenter_name":    ovhtypes.TfStringType{},
 		"availability_zones": types.ListType{ElemType: types.StringType},
 		"services":           types.ListType{ElemType: types.StringType},
+		"type":               ovhtypes.TfStringType{},
+		"activated":          types.BoolType,
+		"object_storage":     types.ObjectType{AttrTypes: cloudRegionObjectStorageAttrTypes()},
 	}
+}
+
+func cloudRegionObjectStorageAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"bare_container_only":      types.BoolType,
+		"is_replication_target":    types.BoolType,
+		"lifecycle_target_classes": types.ListType{ElemType: types.StringType},
+		"replication_supported":    types.BoolType,
+		"storage_classes":          types.ListType{ElemType: types.StringType},
+	}
+}
+
+func cloudRegionObjectStorageToObject(ctx context.Context, objectStorage *cloudRegionAPIObjectStorage) (types.Object, diag.Diagnostics) {
+	if objectStorage == nil {
+		return types.ObjectNull(cloudRegionObjectStorageAttrTypes()), nil
+	}
+
+	var diags diag.Diagnostics
+
+	lifecycleTargetClasses, d := stringSliceToTfList(ctx, objectStorage.LifecycleTargetClasses)
+	diags.Append(d...)
+
+	storageClasses, d := stringSliceToTfList(ctx, objectStorage.StorageClasses)
+	diags.Append(d...)
+
+	obj, d := types.ObjectValue(cloudRegionObjectStorageAttrTypes(), map[string]attr.Value{
+		"bare_container_only":      types.BoolValue(objectStorage.BareContainerOnly),
+		"is_replication_target":    types.BoolValue(objectStorage.IsReplicationTarget),
+		"lifecycle_target_classes": lifecycleTargetClasses,
+		"replication_supported":    types.BoolValue(objectStorage.ReplicationSupported),
+		"storage_classes":          storageClasses,
+	})
+	diags.Append(d...)
+
+	return obj, diags
 }
 
 // stringSliceToTfList converts a Go string slice into a Terraform list of strings. A nil slice
@@ -126,6 +224,13 @@ func (m *cloudRegionDataSourceModel) MergeWith(ctx context.Context, region *Clou
 	diags.Append(d...)
 	m.Services = services
 
+	m.Type = ovhtypes.TfStringValue{StringValue: types.StringPointerValue(region.Type)}
+	m.Activated = types.BoolValue(region.Activated)
+
+	objectStorage, d := cloudRegionObjectStorageToObject(ctx, region.ObjectStorage)
+	diags.Append(d...)
+	m.ObjectStorage = objectStorage
+
 	return diags
 }
 
@@ -140,6 +245,9 @@ func cloudRegionToObject(ctx context.Context, region CloudRegion) (types.Object,
 	services, d := stringSliceToTfList(ctx, region.Services)
 	diags.Append(d...)
 
+	objectStorage, d := cloudRegionObjectStorageToObject(ctx, region.ObjectStorage)
+	diags.Append(d...)
+
 	obj, d := types.ObjectValue(cloudRegionObjectAttrTypes(), map[string]attr.Value{
 		"name":               ovhtypes.TfStringValue{StringValue: types.StringValue(region.Name)},
 		"status":             ovhtypes.TfStringValue{StringValue: types.StringValue(region.Status)},
@@ -148,6 +256,9 @@ func cloudRegionToObject(ctx context.Context, region CloudRegion) (types.Object,
 		"datacenter_name":    ovhtypes.TfStringValue{StringValue: types.StringValue(region.DatacenterName)},
 		"availability_zones": availabilityZones,
 		"services":           services,
+		"type":               ovhtypes.TfStringValue{StringValue: types.StringPointerValue(region.Type)},
+		"activated":          types.BoolValue(region.Activated),
+		"object_storage":     objectStorage,
 	})
 	diags.Append(d...)
 

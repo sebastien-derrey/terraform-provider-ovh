@@ -29,6 +29,7 @@ func TestAccCloudRegionDataSource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("data.ovh_cloud_region.region", "status"),
 					resource.TestCheckResourceAttrSet("data.ovh_cloud_region.region", "continent"),
 					resource.TestCheckResourceAttrSet("data.ovh_cloud_region.region", "services.#"),
+					resource.TestCheckResourceAttrSet("data.ovh_cloud_region.region", "activated"),
 				),
 			},
 		},

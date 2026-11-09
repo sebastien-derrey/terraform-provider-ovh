@@ -30,7 +30,10 @@ data "ovh_cloud_instance_flavors" "all" {
 					// The region filter must yield at least one populated flavor.
 					resource.TestCheckResourceAttrSet("data.ovh_cloud_instance_flavors.all", "flavors.0.name"),
 					resource.TestCheckResourceAttrSet("data.ovh_cloud_instance_flavors.all", "flavors.0.vcpus"),
+					resource.TestCheckResourceAttrSet("data.ovh_cloud_instance_flavors.all", "flavors.0.gpus"),
 					resource.TestCheckResourceAttr("data.ovh_cloud_instance_flavors.all", "flavors.0.location.region", region),
+					resource.TestCheckResourceAttrSet("data.ovh_cloud_instance_flavors.all", "flavors.0.location.region_activated"),
+					resource.TestCheckResourceAttrSet("data.ovh_cloud_instance_flavors.all", "flavors.0.location.availability_zones.#"),
 				),
 			},
 		},

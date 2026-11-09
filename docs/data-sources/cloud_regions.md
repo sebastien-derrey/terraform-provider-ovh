@@ -16,6 +16,14 @@ data "ovh_cloud_regions" "regions" {
 output "regions" {
   value = data.ovh_cloud_regions.regions.regions
 }
+
+# Regions where buckets can be the destination of a replication rule.
+output "replication_target_regions" {
+  value = sort([
+    for region in data.ovh_cloud_regions.regions.regions :
+    region.name if try(region.object_storage.is_replication_target, false)
+  ])
+}
 ```
 
 ## Argument Reference
@@ -34,3 +42,11 @@ The following attributes are exported:
   * `datacenter_name`    - Display name of the datacenter hosting the region.
   * `availability_zones` - Availability zones available in the region.
   * `services`           - Available OpenStack services in the region.
+  * `type`               - Region type (`LOCAL-ZONE`, `REGION-1-AZ` or `REGION-3-AZ`); null when the catalog reports an unrecognized type.
+  * `activated`          - Whether the region is activated on the project. When false, the region exists but is not yet activated for the project.
+  * `object_storage`     - Object storage capabilities of the region; null when the region offers no object storage:
+    * `bare_container_only`      - Whether the region only supports bare containers, without the additional bucket features (encryption, versioning, object lock, lifecycle, replication).
+    * `is_replication_target`    - Whether a bucket in this region can be used as the destination of a replication rule.
+    * `lifecycle_target_classes` - Storage classes that can be used as a transition target in a lifecycle rule in this region.
+    * `replication_supported`    - Whether replication rules can be configured on buckets located in this region.
+    * `storage_classes`          - Storage classes orderable in this region.

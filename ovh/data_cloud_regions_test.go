@@ -23,6 +23,7 @@ func TestAccCloudRegionsDataSource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("data.ovh_cloud_regions.regions", "regions.#"),
 					resource.TestCheckResourceAttrSet("data.ovh_cloud_regions.regions", "regions.0.name"),
 					resource.TestCheckResourceAttrSet("data.ovh_cloud_regions.regions", "regions.0.status"),
+					resource.TestCheckResourceAttrSet("data.ovh_cloud_regions.regions", "regions.0.activated"),
 				),
 			},
 		},

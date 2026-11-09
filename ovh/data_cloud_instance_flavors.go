@@ -110,9 +110,11 @@ func (d *cloudInstanceFlavorsDataSource) Read(ctx context.Context, req datasourc
 			"disk":        m.Disk,
 			"swap":        m.Swap,
 			"ephemeral":   m.Ephemeral,
+			"gpus":        m.Gpus,
 			"is_public":   m.IsPublic,
 			"description": m.Description,
 			"location":    m.Location,
+			"bandwidth":   m.Bandwidth,
 		})
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {

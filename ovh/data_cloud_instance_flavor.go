@@ -42,8 +42,12 @@ func (d *cloudInstanceFlavorDataSource) Configure(_ context.Context, req datasou
 }
 
 const (
-	instanceCatalogLocationRegionDescription = "Region code"
-	instanceCatalogLocationAZDescription     = "Availability zone within the region"
+	instanceCatalogLocationRegionDescription         = "Region code"
+	instanceCatalogLocationAZDescription             = "Availability zone within the region"
+	instanceFlavorLocationRegionActivatedDescription = "Whether the region is already activated on the project. When false, the region must be activated on the project before use."
+	instanceFlavorLocationAZsDescription             = "Availability zones of the region (for example `eu-west-par-a`, `eu-west-par-b`, `eu-west-par-c`). Empty for a single-AZ region."
+	instanceFlavorLocationAZDescription              = "Deprecated, always empty: a flavor is offered per region, not per availability zone. Use `availability_zones`."
+	instanceFlavorLocationAZDeprecation              = "Always empty: a flavor is offered per region, not per availability zone. Use `availability_zones` instead."
 )
 
 func instanceCatalogLocationDataSourceAttribute(description string) schema.SingleNestedAttribute {
@@ -110,6 +114,11 @@ func instanceFlavorDataSourceAttributes() map[string]schema.Attribute {
 			Description:         "Size of the flavor's ephemeral disk in GB. Ephemeral storage is transient: its contents do not survive a rebuild or deletion of the instance. Zero when the flavor provides no ephemeral disk.",
 			MarkdownDescription: "Size of the flavor's ephemeral disk in GB. Ephemeral storage is transient: its contents do not survive a rebuild or deletion of the instance. Zero when the flavor provides no ephemeral disk.",
 		},
+		"gpus": schema.Int64Attribute{
+			Computed:            true,
+			Description:         "Number of physical GPUs provided by the flavor. Zero for flavors without GPU.",
+			MarkdownDescription: "Number of physical GPUs provided by the flavor. Zero for flavors without GPU.",
+		},
 		"is_public": schema.BoolAttribute{
 			Computed:            true,
 			Description:         "Whether the flavor is publicly available to the project. Private flavors are only visible to the projects they have been explicitly shared with.",
@@ -121,10 +130,55 @@ func instanceFlavorDataSourceAttributes() map[string]schema.Attribute {
 			Description:         "Free-form description of the flavor as reported by the backend. May be empty when no description is advertised for this flavor.",
 			MarkdownDescription: "Free-form description of the flavor as reported by the backend. May be empty when no description is advertised for this flavor.",
 		},
-		"location": instanceCatalogLocationDataSourceAttribute(
-			"Region (and, where applicable, availability zone) where this flavor is offered. The flavor catalog is per-region: a flavor returned for one region is not guaranteed to exist, or to carry the same characteristics, in another.",
-		),
+		"location": instanceFlavorLocationDataSourceAttribute(),
+		"bandwidth": schema.SingleNestedAttribute{
+			Computed:            true,
+			Description:         "Network bandwidth an instance of the flavor gets, in Mbit/s.",
+			MarkdownDescription: "Network bandwidth an instance of the flavor gets, in Mbit/s.",
+			Attributes: map[string]schema.Attribute{
+				"private": schema.Int64Attribute{
+					Computed:            true,
+					Description:         "Bandwidth on private networks (vRack), in Mbit/s. Null when the flavor does not declare it.",
+					MarkdownDescription: "Bandwidth on private networks (vRack), in Mbit/s. Null when the flavor does not declare it.",
+				},
+				"public_inbound": schema.Int64Attribute{
+					Computed:            true,
+					Description:         "Inbound bandwidth on the public network, in Mbit/s. Null when the flavor does not declare it.",
+					MarkdownDescription: "Inbound bandwidth on the public network, in Mbit/s. Null when the flavor does not declare it.",
+				},
+				"public_outbound": schema.Int64Attribute{
+					Computed:            true,
+					Description:         "Outbound bandwidth on the public network, in Mbit/s. Null when the flavor does not declare it.",
+					MarkdownDescription: "Outbound bandwidth on the public network, in Mbit/s. Null when the flavor does not declare it.",
+				},
+			},
+		},
 	}
+}
+
+func instanceFlavorLocationDataSourceAttribute() schema.SingleNestedAttribute {
+	location := instanceCatalogLocationDataSourceAttribute(
+		"Region where this flavor is offered, whether it is activated on the project and its availability zones. The flavor catalog is per-region: a flavor returned for one region is not guaranteed to exist, or to carry the same characteristics, in another.",
+	)
+	location.Attributes["availability_zone"] = schema.StringAttribute{
+		CustomType:          ovhtypes.TfStringType{},
+		Computed:            true,
+		Description:         instanceFlavorLocationAZDescription,
+		MarkdownDescription: instanceFlavorLocationAZDescription,
+		DeprecationMessage:  instanceFlavorLocationAZDeprecation,
+	}
+	location.Attributes["region_activated"] = schema.BoolAttribute{
+		Computed:            true,
+		Description:         instanceFlavorLocationRegionActivatedDescription,
+		MarkdownDescription: instanceFlavorLocationRegionActivatedDescription,
+	}
+	location.Attributes["availability_zones"] = schema.ListAttribute{
+		ElementType:         ovhtypes.TfStringType{},
+		Computed:            true,
+		Description:         instanceFlavorLocationAZsDescription,
+		MarkdownDescription: instanceFlavorLocationAZsDescription,
+	}
+	return location
 }
 
 func (d *cloudInstanceFlavorDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {

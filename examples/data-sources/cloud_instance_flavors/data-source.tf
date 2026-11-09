@@ -20,3 +20,11 @@ output "large_flavor_names" {
     flavor.name if flavor.is_public && flavor.ram >= 16384
   ])
 }
+
+# Every GPU flavor of the region.
+output "gpu_flavor_names" {
+  value = sort([
+    for flavor in data.ovh_cloud_instance_flavors.flavors.flavors :
+    flavor.name if flavor.gpus > 0
+  ])
+}
